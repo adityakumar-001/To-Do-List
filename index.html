@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Daily To-Do • 24H Reset</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="bg"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">✓</div>
+      <div>
+        <h1>Daily Task Tracker</h1>
+        <p id="dateLine">—</p>
+      </div>
+    </div>
+    <div class="clock-box">
+      <div id="clock">00:00:00</div>
+      <span>24H • LIVE</span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- LEFT: Today's + Future tasks -->
+    <div class="col">
+    <section class="card">
+      <div class="card-head">
+        <h2>📝 Today's Tasks <span id="todayLabel"></span></h2>
+      </div>
+
+      <div class="progress-wrap">
+        <div class="progress-info">
+          <span id="progressText">0 / 0 done</span>
+          <span id="resetNote">Auto-reset at midnight</span>
+        </div>
+        <div class="progress"><div id="progressBar"></div></div>
+      </div>
+
+      <form id="taskForm" class="add-row">
+        <input id="taskInput" type="text" placeholder="Write your task... e.g. Gym at 7 AM" maxlength="120" autocomplete="off" />
+        <input id="timeInput" type="time" title="Time (24H)" />
+        <input id="dateInput" type="date" title="Date — aaj ya aane wala koi din" />
+        <button type="submit" class="btn primary">+ Add</button>
+      </form>
+      <p class="hint" id="addHint">📅 Date chuno: aaj ka task aaj me, future date ka task Future list me jayega.</p>
+
+      <ul id="taskList" class="task-list"></ul>
+      <p id="emptyMsg" class="empty">No tasks yet. Add your first task above 👆</p>
+
+      <div class="actions">
+        <button id="clearDoneBtn" class="btn ghost small">Remove completed (today)</button>
+        <button id="checkoutBtn" class="btn success small">✔ Day Checkout</button>
+      </div>
+    </section>
+
+    <!-- FUTURE TASKS -->
+    <section class="card future-card">
+      <div class="card-head">
+        <h2>🔮 Future Tasks <span id="futureCount"></span></h2>
+        <button id="clearFutureDoneBtn" class="btn ghost small" title="Jo future task complete + date nikal gayi, use saaf karo">Clear passed ✔</button>
+      </div>
+      <div id="futureList" class="future-list"></div>
+      <p id="futureEmpty" class="empty">Koi future task nahi. Upar date select karke add karo 📅</p>
+    </section>
+    </div>
+
+    <!-- RIGHT: Calendar + Log -->
+    <aside class="side">
+      <section class="card">
+        <h2>📅 Calendar</h2>
+        <div class="cal-head">
+          <button id="prevMonth" class="btn ghost small">‹</button>
+          <strong id="calTitle">—</strong>
+          <button id="nextMonth" class="btn ghost small">›</button>
+        </div>
+        <div class="weekdays"><span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span></div>
+        <div id="calendar" class="calendar"></div>
+        <p class="hint">🟢 ● = log &nbsp; • &nbsp; 🟡 ● = future task &nbsp; • &nbsp; <b>blue</b> = today &nbsp; • &nbsp; click date = us din ka task add karo</p>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>🕒 Log / History</h2>
+          <button id="clearLogBtn" class="btn ghost small">Clear log</button>
+        </div>
+        <div id="logList" class="log-list"></div>
+      </section>
+    </aside>
+  </main>
+
+  <footer>Future task uski date tak Future list + Checkout me rahega (✔ hone par bhi). Date nikalne / midnight par auto-save hokar log me jayega.</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

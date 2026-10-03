@@ -1,0 +1,98 @@
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, Arial, sans-serif; }
+body { min-height: 100vh; color: #eef2ff; background: #0b1020; padding: 18px; }
+.bg { position: fixed; inset: 0; z-index: -1;
+  background: radial-gradient(600px 400px at 15% 10%, #4f46e5 0%, transparent 60%),
+              radial-gradient(600px 400px at 90% 20%, #06b6d4 0%, transparent 60%),
+              radial-gradient(700px 500px at 50% 100%, #db2777 0%, transparent 55%),
+              #0b1020;
+  opacity: .35; }
+
+.topbar { max-width: 1050px; margin: 0 auto 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.brand { display: flex; gap: 12px; align-items: center; }
+.logo { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; font-size: 26px; font-weight: 900; color: #fff;
+  background: linear-gradient(135deg, #22c55e, #16a34a); box-shadow: 0 8px 24px rgba(34,197,94,.4); }
+.brand h1 { font-size: 22px; }
+.brand p { opacity: .75; font-size: 14px; }
+.clock-box { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.15); backdrop-filter: blur(8px);
+  padding: 8px 18px; border-radius: 14px; text-align: center; }
+.clock-box #clock { font-size: 30px; font-weight: 800; letter-spacing: 2px; font-variant-numeric: tabular-nums; }
+.clock-box span { font-size: 11px; letter-spacing: 2px; opacity: .7; }
+
+.layout { max-width: 1050px; margin: 0 auto; display: grid; grid-template-columns: 1.4fr .9fr; gap: 16px; align-items: start; }
+@media (max-width: 850px) { .layout { grid-template-columns: 1fr; } }
+.col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+.card { background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.14); border-radius: 18px; padding: 18px; backdrop-filter: blur(10px); box-shadow: 0 12px 40px rgba(0,0,0,.35); }
+.card h2 { font-size: 18px; margin-bottom: 12px; }
+.card-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+#todayLabel { font-size: 12px; opacity: .7; font-weight: 400; }
+
+.progress-wrap { margin: 10px 0 14px; }
+.progress-info { display: flex; justify-content: space-between; font-size: 13px; opacity: .9; margin-bottom: 6px; }
+#resetNote { opacity: .6; font-size: 12px; }
+.progress { height: 10px; background: rgba(255,255,255,.12); border-radius: 99px; overflow: hidden; }
+#progressBar { height: 100%; width: 0%; border-radius: 99px; background: linear-gradient(90deg, #22c55e, #a3e635); transition: width .3s; }
+
+.add-row { display: flex; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+.add-row input[type="text"] { flex: 1; min-width: 160px; padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,.2); background: rgba(0,0,0,.3); color: #fff; outline: none; }
+.add-row input[type="text"]:focus { border-color: #22c55e; }
+.add-row input[type="time"], .add-row input[type="date"] { padding: 10px; border-radius: 12px; border: 1px solid rgba(255,255,255,.2); background: rgba(0,0,0,.3); color: #fff; color-scheme: dark; }
+.add-row input[type="date"]:focus { border-color: #a855f7; }
+
+.btn { border: none; cursor: pointer; border-radius: 12px; padding: 12px 18px; font-weight: 700; color: #fff; transition: .15s; }
+.btn.primary { background: linear-gradient(135deg, #22c55e, #15803d); }
+.btn.primary:hover { filter: brightness(1.1); }
+.btn.ghost { background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.15); padding: 9px 14px; font-size: 14px; }
+.btn.ghost:hover { background: rgba(255,255,255,.2); }
+.btn.small { padding: 8px 12px; font-size: 13px; }
+.btn.success { background: linear-gradient(135deg, #0ea5e9, #2563eb); }
+.btn.danger { background: rgba(239,68,68,.2); border: 1px solid rgba(239,68,68,.5); }
+
+.task-list { list-style: none; display: flex; flex-direction: column; gap: 9px; }
+.task-list li { display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,.28); border: 1px solid rgba(255,255,255,.12); padding: 11px 12px; border-radius: 13px; animation: pop .2s; }
+@keyframes pop { from { transform: scale(.97); opacity: 0; } }
+.task-list li.done { opacity: .65; border-color: rgba(34,197,94,.5); }
+.task-list li.done .txt { text-decoration: line-through; }
+.check { width: 24px; height: 24px; border-radius: 8px; border: 2px solid #22c55e; background: transparent; cursor: pointer; font-size: 15px; color: #fff; display: grid; place-items: center; flex-shrink: 0; }
+li.done .check { background: #22c55e; }
+.txt { flex: 1; word-break: break-word; }
+.time-badge { font-size: 12px; background: rgba(34,211,238,.18); border: 1px solid rgba(34,211,238,.4); padding: 3px 9px; border-radius: 99px; white-space: nowrap; }
+.del { background: transparent; border: none; cursor: pointer; font-size: 17px; opacity: .6; }
+.del:hover { opacity: 1; }
+.empty { text-align: center; opacity: .6; margin: 18px 0; font-size: 14px; }
+.actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+
+.side { display: flex; flex-direction: column; gap: 16px; }
+.cal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.weekdays, .calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; text-align: center; }
+.weekdays { font-size: 12px; opacity: .6; margin-bottom: 5px; }
+.calendar div { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 10px; background: rgba(255,255,255,.06); font-size: 13px; position: relative; cursor: default; transition: .15s; }
+.calendar div.today { background: #2563eb; font-weight: 800; }
+.calendar div.has-log::after { content: ''; width: 6px; height: 6px; border-radius: 99px; background: #22c55e; margin-top: 2px; }
+.calendar div.has-future { border: 1px solid rgba(234,179,8,.6); background: rgba(234,179,8,.15); }
+.calendar div.has-future::after { content: ''; width: 6px; height: 6px; border-radius: 99px; background: #eab308; margin-top: 2px; }
+.calendar div.has-log.has-future::after { background: linear-gradient(90deg, #22c55e 50%, #eab308 50%); width: 12px; }
+.calendar div.pickable { cursor: pointer; }
+.calendar div.pickable:hover { background: rgba(168,85,247,.4); transform: scale(1.05); }
+.calendar div.dim { opacity: .25; }
+.hint { font-size: 12px; opacity: .6; margin-top: 8px; }
+#addHint { margin: 0 0 12px; opacity: .65; }
+.future-card { border-color: rgba(168,85,247,.35); }
+.future-list { display: flex; flex-direction: column; gap: 12px; max-height: 420px; overflow-y: auto; }
+.future-day { background: rgba(0,0,0,.3); border: 1px solid rgba(168,85,247,.3); border-radius: 12px; padding: 10px 12px; }
+.future-day h4 { font-size: 13px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.f-badge { background: rgba(168,85,247,.25); border: 1px solid rgba(168,85,247,.4); padding: 2px 10px; border-radius: 99px; font-size: 11px; font-weight: 600; }
+#futureCount { font-size: 12px; opacity: .7; font-weight: 400; }
+.mini-btn { background: rgba(168,85,247,.2); border: 1px solid rgba(168,85,247,.4); color: #e9d5ff; cursor: pointer; font-size: 11px; padding: 3px 8px; border-radius: 99px; white-space: nowrap; }
+.mini-btn:hover { background: rgba(168,85,247,.35); }
+
+.log-list { display: flex; flex-direction: column; gap: 10px; max-height: 380px; overflow-y: auto; }
+.log-day { background: rgba(0,0,0,.3); border: 1px solid rgba(255,255,255,.1); border-radius: 12px; padding: 10px 12px; }
+.log-day h4 { font-size: 13px; margin-bottom: 6px; display: flex; justify-content: space-between; }
+.log-day h4 span { background: rgba(34,197,94,.2); padding: 1px 9px; border-radius: 99px; font-size: 11px; }
+.log-day ul { list-style: none; font-size: 13px; opacity: .9; display: flex; flex-direction: column; gap: 3px; }
+.log-day li.ok::before { content: '✔ '; color: #22c55e; }
+.log-day li.no::before { content: '○ '; opacity: .6; }
+.log-empty { opacity: .55; font-size: 13px; text-align: center; padding: 10px; }
+
+footer { max-width: 1050px; margin: 16px auto 0; text-align: center; font-size: 12px; opacity: .55; }
