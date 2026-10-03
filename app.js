@@ -2,6 +2,9 @@
 const KEY_DATE = 'dailyTodo_currentDate';
 const KEY_TASKS = 'dailyTodo_tasks';
 const KEY_LOG = 'dailyTodo_history';
+const KEY_CAL = 'dailyTodo_calView';
+const KEY_SHARES = 'dailyTodo_shares';
+const KEY_IMPORTED = 'dailyTodo_importedSids';
 
 const $ = (id) => document.getElementById(id);
 const taskForm = $('taskForm'), taskInput = $('taskInput'), timeInput = $('timeInput'), dateInput = $('dateInput');
@@ -10,8 +13,22 @@ const progressBar = $('progressBar'), progressText = $('progressText');
 const logList = $('logList'), calendarEl = $('calendar'), calTitle = $('calTitle');
 const futureList = $('futureList'), futureEmpty = $('futureEmpty'), futureCount = $('futureCount');
 
-let calView = new Date();
-calView.setDate(1);
+// ---- Calendar view (month) persistence: refresh par month reset/“vanish” na lage ----
+function loadCalView() {
+  try {
+    const o = JSON.parse(localStorage.getItem(KEY_CAL));
+    if (o && Number.isInteger(o.y) && Number.isInteger(o.m) && o.m >= 0 && o.m <= 11) {
+      return new Date(o.y, o.m, 1);
+    }
+  } catch { /* ignore -> current month */ }
+  const d = new Date();
+  d.setDate(1);
+  return d;
+}
+function saveCalView() {
+  try { localStorage.setItem(KEY_CAL, JSON.stringify({ y: calView.getFullYear(), m: calView.getMonth() })); } catch { /* ignore */ }
+}
+let calView = loadCalView();
 
 function todayStr(d = new Date()) {
   const y = d.getFullYear();
@@ -81,6 +98,7 @@ function checkMidnightReset() {
     localStorage.setItem(KEY_DATE, today);
     calView = new Date();
     calView.setDate(1);
+    saveCalView();
     renderAll();
   }
 }
@@ -100,10 +118,14 @@ function archivePastDates(today) {
 // ---- Render today's tasks ----
 function renderTasks() {
   const today = todayStr();
-  const tasks = loadTasks();
+  let tasks = loadTasks();
+  // purane tasks jinki date < today reh gayi ho (tab khula hi nahi) — turant archive karo.
+  // (Recursion nahi: archive ke baad fresh load karke aage badho, taaki calendar kabhi skip na ho.)
+  if (tasks.some(t => t.date < today)) {
+    archivePastDates(today);
+    tasks = loadTasks();
+  }
   const todays = tasks.filter(t => t.date === today);
-  // purane tasks jinki date < today reh gayi ho (tab khula hi nahi) — turant archive karo
-  if (tasks.some(t => t.date < today)) { archivePastDates(today); return renderAll(); }
 
   taskList.innerHTML = '';
   emptyMsg.style.display = todays.length ? 'none' : 'block';
@@ -192,9 +214,15 @@ function renderFuture() {
 
 // ---- Render calendar (log dots + future dots + click to pick date) ----
 function renderCalendar() {
-  const log = loadLog();
-  const tasks = loadTasks();
-  const futureDates = new Set(tasks.filter(t => t.date > todayStr()).map(t => t.date));
+  try {
+    // corrupt calView kabhi calendar ko khaali na chhode — hamesha valid month par lao
+    if (!(calView instanceof Date) || isNaN(calView.getTime())) {
+      calView = new Date();
+      calView.setDate(1);
+    }
+    const log = loadLog();
+    const tasks = loadTasks();
+    const futureDates = new Set(tasks.filter(t => t.date > todayStr()).map(t => t.date));
   const y = calView.getFullYear(), m = calView.getMonth();
   calTitle.textContent = calView.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   const firstDay = new Date(y, m, 1).getDay();
@@ -224,6 +252,16 @@ function renderCalendar() {
       };
     }
     calendarEl.appendChild(el);
+    }
+  } catch (err) {
+    // Calendar kabhi vanish na ho: error par fallback message dikhao, grid khaali mat chhodo
+    console.error('renderCalendar failed:', err);
+    try {
+      calView = new Date();
+      calView.setDate(1);
+      saveCalView();
+      calendarEl.innerHTML = '<p class="log-empty">Calendar load nahi hua — page refresh karo. Tasks safe hain.</p>';
+    } catch { /* ignore */ }
   }
 }
 
@@ -245,43 +283,95 @@ function renderLog() {
 }
 function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
-// ---- Data Encoder / Decoder for Sharing (A person -> B person) ----
+// ---- Share: Unique Share ID + Encoder/Decoder (A person -> B person) ----
 // Problem: localStorage sirf usi browser me hota hai. GitHub Pages par file public
 // hone se sirf code share hota hai, data nahi. Isliye B ko khaali list dikhti hai
 // ya purana data overwrite/remove jaisa lagta hai.
-// Solution: tasks ko Base64URL me encode karke link me bhejo (?s=...).
-// B ke kholte hi link se decode hokar tasks merge ho jayenge, kuch remove nahi hoga.
-function encodeData(arr) {
-  const json = JSON.stringify(arr);
+// Solution: tasks ko Base64URL me encode karke link me bhejo (?s=... / #s=...).
+// Har share ke saath ek Unique Share ID (jaise TD-X1AB9Q) banta hai.
+// B ke kholte hi link se decode hokar tasks MERGE honge — kuch remove nahi hoga.
+// Same Share ID dobara kholne/paste karne par duplicate add nahi hoga.
+function encodeJson(value) {
+  const json = JSON.stringify(value);
   // Hindi/emoji safe (UTF-8 -> base64)
   const b64 = btoa(unescape(encodeURIComponent(json)));
   // URL-safe: + -> -, / -> _, = padding hatao
   return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
+function decodeJson(code) {
+  if (!code || typeof code !== 'string') return null;
+  let b64 = code.replace(/-/g, '+').replace(/_/g, '/');
+  while (b64.length % 4) b64 += '=';
+  const json = decodeURIComponent(escape(atob(b64)));
+  return JSON.parse(json);
+}
+// purana helper naam bhi rakha (backward compat) — ab koi bhi JSON value encode karta hai
+function encodeData(value) { return encodeJson(value); }
+function sanitizeTasks(arr) {
+  if (!Array.isArray(arr)) return [];
+  return arr.filter(x => x && typeof x.text === 'string' && typeof x.date === 'string')
+    .map(x => ({ id: x.id, text: String(x.text).slice(0, 200), time: typeof x.time === 'string' ? x.time : '', date: x.date, done: !!x.done }));
+}
 function decodeData(code) {
+  // Legacy: code seedha tasks array tha. Ab object {v,sid,tasks} bhi support.
+  // Return hamesha { sid, tasks } ya null.
   try {
-    if (!code || typeof code !== 'string') return null;
-    let b64 = code.replace(/-/g, '+').replace(/_/g, '/');
-    while (b64.length % 4) b64 += '=';
-    const json = decodeURIComponent(escape(atob(b64)));
-    const arr = JSON.parse(json);
-    if (!Array.isArray(arr)) return null;
-    // sirf valid task object rakho — galat data se purana data remove na ho
-    return arr.filter(x => x && typeof x.text === 'string' && typeof x.date === 'string');
+    const val = decodeJson(code);
+    if (Array.isArray(val)) return { sid: null, tasks: sanitizeTasks(val) };
+    if (val && Array.isArray(val.tasks)) {
+      return { sid: typeof val.sid === 'string' ? val.sid : null, tasks: sanitizeTasks(val.tasks) };
+    }
+    return null;
   } catch { return null; }
 }
-function getShareLink() {
-  const tasks = loadTasks();
-  const code = encodeData(tasks);
-  const base = location.href.split('?')[0].split('#')[0];
-  return `${base}?s=${code}`;
+function genShareId() {
+  const existing = new Set(Object.keys(loadShares()));
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const t = Date.now().toString(36).toUpperCase().slice(-3);
+    let r = '';
+    for (let i = 0; i < 3; i++) r += chars[Math.floor(Math.random() * chars.length)];
+    const sid = `TD-${t}${r}`;
+    if (!existing.has(sid) && !getImportedSids().includes(sid)) return sid;
+  }
+  return `TD-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 1296).toString(36).toUpperCase()}`;
 }
+function loadShares() { try { return JSON.parse(localStorage.getItem(KEY_SHARES)) || {}; } catch { return {}; } }
+function saveShares(o) { try { localStorage.setItem(KEY_SHARES, JSON.stringify(o)); } catch { /* ignore */ } }
+function getImportedSids() { try { return JSON.parse(localStorage.getItem(KEY_IMPORTED)) || []; } catch { return []; } }
+function markSidImported(sid) {
+  if (!sid) return;
+  try {
+    const arr = getImportedSids();
+    if (!arr.includes(sid)) { arr.push(sid); localStorage.setItem(KEY_IMPORTED, JSON.stringify(arr.slice(-100))); }
+  } catch { /* ignore */ }
+}
+function createShare() {
+  const tasks = loadTasks();
+  const sid = genShareId();
+  const payload = { v: 1, sid, createdAt: new Date().toISOString(), count: tasks.length, tasks };
+  const code = encodeJson(payload);
+  const base = location.href.split('?')[0].split('#')[0];
+  const link = `${base}#s=${code}`;
+  const shares = loadShares();
+  shares[sid] = { createdAt: payload.createdAt, count: tasks.length };
+  saveShares(shares);
+  try { localStorage.setItem('dailyTodo_lastShare', sid); } catch { /* ignore */ }
+  return { sid, link, code, count: tasks.length };
+}
+function getLastShareSid() { try { return localStorage.getItem('dailyTodo_lastShare') || ''; } catch { return ''; } }
+function getShareLink() { return createShare().link; } // backward-compat wrapper
+// MERGE ONLY — kabhi overwrite/delete nahi. Returns added count.
 function importSharedTasks(sharedArr) {
   if (!sharedArr || !sharedArr.length) return 0;
   const tasks = loadTasks();
   const ids = new Set(tasks.map(t => String(t.id)));
+  // same text+date+time wala task pehle se ho to skip (share-refresh safe)
+  const sigs = new Set(tasks.map(t => `${t.date}||${t.time || ''}||${t.text}`));
   let added = 0;
   sharedArr.forEach(t => {
+    const sig = `${t.date}||${t.time || ''}||${t.text}`;
+    if (sigs.has(sig)) return; // duplicate task — skip, taaki list “hatti” ya double na lage
     // id na ho ya clash ho to nayi id do — taaki purana task remove/overwrite na ho
     if (!t.id || ids.has(String(t.id))) {
       t.id = Date.now() + Math.floor(Math.random() * 1000000) + added;
@@ -290,30 +380,96 @@ function importSharedTasks(sharedArr) {
     if (!t.time) t.time = '';
     tasks.push(t);
     ids.add(String(t.id));
+    sigs.add(sig);
     added++;
   });
   saveTasks(tasks);
   return added;
 }
+function importSharedPayload(payload) {
+  if (!payload || !Array.isArray(payload.tasks)) return { status: 'invalid' };
+  if (payload.sid && getImportedSids().includes(payload.sid)) {
+    return { status: 'duplicate', sid: payload.sid, added: 0 };
+  }
+  const added = importSharedTasks(payload.tasks);
+  if (payload.sid) markSidImported(payload.sid);
+  return { status: added ? 'added' : 'empty', sid: payload.sid, added };
+}
+function getIncomingShareCode() {
+  try {
+    const q = new URLSearchParams(location.search);
+    const fromQuery = q.get('s') || q.get('share');
+    if (fromQuery) return fromQuery;
+  } catch { /* ignore */ }
+  const h = location.hash || '';
+  const m = h.match(/[#&?](s|share)=([^&]+)/);
+  if (m) { try { return decodeURIComponent(m[2]); } catch { return m[2]; } }
+  return null;
+}
+// Sirf share wala param hatao — poora path mat badlo (taaki refresh par calendar/state safe rahe)
+function cleanShareUrl() {
+  try {
+    const url = new URL(location.href);
+    url.searchParams.delete('s');
+    url.searchParams.delete('share');
+    if (url.hash) {
+      let nh = url.hash.replace(/[#&?](s|share)=[^&]*/g, '');
+      nh = nh.replace(/^#&/, '#').replace(/^#\?/, '#');
+      url.hash = (nh === '#' || nh === '') ? '' : nh;
+    }
+    history.replaceState(null, '', url.pathname + url.search + url.hash);
+  } catch {
+    // Fallback (bahut purana browser): kam se kam share code to URL se hatao
+    try {
+      const rawHash = String(location.hash || '').replace(/[#&?](s|share)=[^&]*/g, '');
+      const cleanHash = (rawHash === '#' || rawHash === '#&' || rawHash === '#?') ? '' : rawHash.replace(/^#&/, '#');
+      const rawSearch = String(location.search || '').replace(/([?&])(s|share)=[^&]*/g, '$1').replace(/[?&]$/, '').replace(/\?&/, '?');
+      const cleanSearch = (rawSearch === '?' || rawSearch === '') ? '' : rawSearch;
+      history.replaceState(null, '', location.pathname + cleanSearch + cleanHash);
+    } catch { /* ignore */ }
+  }
+}
+// Paste kiye gaye text se code nikalo: full link (?s= / #s=) ya raw code. Sirf ID (TD-XXX) me data nahi hota.
+function extractShareCode(input) {
+  const s = String(input || '').trim();
+  if (!s) return { code: null };
+  const qm = s.match(/[?#&](s|share)=([^&\s]+)/);
+  if (qm) { try { return { code: decodeURIComponent(qm[2]) }; } catch { return { code: qm[2] }; } }
+  if (/^TD-[A-Z0-9]{3,}$/i.test(s)) return { onlyId: s.toUpperCase() };
+  if (/^[A-Za-z0-9\-_]{8,}={0,2}$/.test(s)) return { code: s };
+  return { code: null };
+}
 function checkShareImport() {
-  const params = new URLSearchParams(location.search);
-  const code = params.get('s');
+  const code = getIncomingShareCode();
   if (!code) return;
-  const shared = decodeData(code);
-  if (shared && shared.length) {
-    const n = importSharedTasks(shared);
-    // link se ?s= hatao taaki refresh par dobara add na ho
-    history.replaceState(null, '', location.pathname);
+  const payload = decodeData(code);
+  cleanShareUrl(); // refresh par dobara import na ho — pehle hi URL saaf karo
+  if (payload && payload.tasks.length) {
+    const res = importSharedPayload(payload);
     renderAll();
-    alert(`🔗 ${n} shared task(s) add ho gaye! Aapka purana data safe hai — kuch remove nahi hua.`);
-  } else if (shared && !shared.length) {
-    history.replaceState(null, '', location.pathname);
+    if (res.status === 'duplicate') {
+      showShareMsg(`ℹ️ Share ID ${payload.sid} pehle hi add ho chuka hai — duplicate add nahi kiya. Purana data safe hai.`, false);
+      alert(`ℹ️ Share ID ${payload.sid} already imported hai — kuch duplicate add nahi hua.`);
+    } else {
+      showShareMsg(`✅ Share ID ${payload.sid || '(legacy)'}: ${res.added} task(s) add ho gaye. Purana data safe hai.`, true);
+      alert(`🔗 Share ID ${payload.sid || '(legacy)'}: ${res.added} shared task(s) add ho gaye!\nAapka purana data safe hai — kuch remove nahi hua.`);
+    }
+    refreshLastShareInfo();
+  } else if (payload && !payload.tasks.length) {
+    renderAll(); // khaali share — kuch mat karo
   } else {
+    showShareMsg('⚠️ Share link kharab hai — decode nahi hua. Kuch remove/change nahi kiya.', false);
     alert('⚠️ Share link kharab hai — decode nahi hua. Kuch remove/change nahi kiya.');
   }
 }
 
-function renderAll() { renderTasks(); renderFuture(); renderCalendar(); renderLog(); }
+function renderAll() {
+  // Har section independent try/catch me — ek fail ho to bhi calendar/log kabhi vanish na ho
+  try { renderTasks(); } catch (e) { console.error('renderTasks failed:', e); }
+  try { renderFuture(); } catch (e) { console.error('renderFuture failed:', e); }
+  try { renderCalendar(); } catch (e) { console.error('renderCalendar failed:', e); }
+  try { renderLog(); } catch (e) { console.error('renderLog failed:', e); }
+}
 
 // ---- Events ----
 function initDateInput() {
@@ -367,15 +523,106 @@ $('clearLogBtn').onclick = () => {
   if (!confirm('Delete the entire history log?')) return;
   saveLog({}); renderAll();
 };
-$('prevMonth').onclick = () => { calView.setMonth(calView.getMonth() - 1); renderCalendar(); };
-$('nextMonth').onclick = () => { calView.setMonth(calView.getMonth() + 1); renderCalendar(); };
-$('shareBtn').onclick = async () => {
-  const link = getShareLink();
+$('prevMonth').onclick = () => { calView.setMonth(calView.getMonth() - 1); saveCalView(); renderCalendar(); };
+$('nextMonth').onclick = () => { calView.setMonth(calView.getMonth() + 1); saveCalView(); renderCalendar(); };
+
+// ---- Share panel (Unique Share ID) ----
+function showShareMsg(text, ok) {
+  const el = $('shareMsg');
+  if (!el) return;
+  el.textContent = text;
+  el.classList.toggle('ok', !!ok);
+  el.classList.toggle('err', !ok);
+}
+function openSharePanel(withFreshShare) {
+  const panel = $('sharePanel');
+  if (!panel) return;
+  panel.hidden = false;
+  if (withFreshShare) {
+    const { sid, link, count } = createShare();
+    $('shareIdBadge').textContent = sid;
+    $('shareIdText').textContent = sid;
+    $('shareLinkText').value = link;
+    showShareMsg(`✅ Naya Share ID ${sid} bana (${count} tasks). Link auto-copy karne ki koshish ho rahi hai...`, true);
+    copyText(link, `🔗 Share ID ${sid} ka link copy ho gaya! B ko bhejo.`);
+    refreshLastShareInfo();
+  } else {
+    const last = getLastShareSid();
+    if (last) {
+      $('shareIdBadge').textContent = last;
+      $('shareIdText').textContent = last;
+      const shares = loadShares();
+      showShareMsg(`Pichhla Share ID: ${last}${shares[last] ? ` (${shares[last].count} tasks)` : ''}. Naya link chahiye to “Share Link” dabao.`, true);
+    } else {
+      showShareMsg('B ka link/code neeche paste karke Import dabao. Naya link banane ke liye “Share Link” dabao.', true);
+    }
+  }
+  $('sharePanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+function refreshLastShareInfo() {
+  const el = $('lastShareInfo');
+  if (!el) return;
+  const last = getLastShareSid();
+  const shares = loadShares();
+  if (last && shares[last]) {
+    el.textContent = `Last Share ID: ${last} • ${shares[last].count} tasks • ${new Date(shares[last].createdAt).toLocaleString()}`;
+  } else if (last) {
+    el.textContent = `Last Share ID: ${last}`;
+  } else {
+    el.textContent = '';
+  }
+}
+async function copyText(text, okAlert) {
   try {
-    await navigator.clipboard.writeText(link);
-    alert('🔗 Share link copy ho gaya! B person ko WhatsApp/Telegram par bhejo.\n\nLink kholte hi tasks auto-add honge, purana data remove nahi hoga.');
+    await navigator.clipboard.writeText(text);
+    if (okAlert) alert(okAlert + '\n\nLink kholte hi tasks auto-add honge, purana data remove nahi hoga.');
+    return true;
   } catch {
-    prompt('Ye link copy karke B ko bhejo:', link);
+    prompt('Copy karke B ko bhejo:', text);
+    return false;
+  }
+}
+$('shareBtn').onclick = () => openSharePanel(true);
+$('importOpenBtn').onclick = () => openSharePanel(false);
+$('shareCloseBtn').onclick = () => { $('sharePanel').hidden = true; };
+$('copyIdBtn').onclick = () => {
+  const sid = $('shareIdText').textContent;
+  if (!sid || sid === '—') { showShareMsg('Pehle “Share Link” dabakar ID banao.', false); return; }
+  copyText(sid, `Share ID ${sid} copy ho gaya! (Note: sirf ID se import nahi hoga — poora link/code bhejo.)`);
+};
+$('copyLinkBtn').onclick = () => {
+  const link = $('shareLinkText').value;
+  if (!link) { showShareMsg('Pehle “Share Link” dabakar link banao.', false); return; }
+  copyText(link, '🔗 Share link copy ho gaya! B ko bhejo.');
+};
+$('importBtn').onclick = () => {
+  const raw = $('importInput').value;
+  const found = extractShareCode(raw);
+  if (found.onlyId) {
+    showShareMsg(`⚠️ "${found.onlyId}" sirf Share ID hai — usme task data nahi hota. B se poora share link/code maango aur yahan paste karo.`, false);
+    return;
+  }
+  if (!found.code) {
+    showShareMsg('⚠️ Koi valid share link/code nahi mila. Poora link paste karo (usme #s= ya ?s= hota hai). Kuch remove nahi kiya.', false);
+    return;
+  }
+  const payload = decodeData(found.code);
+  if (!payload) {
+    showShareMsg('⚠️ Ye code decode nahi hua — link adhura/galat hai. Kuch remove/change nahi kiya.', false);
+    return;
+  }
+  if (!payload.tasks.length) {
+    showShareMsg('ℹ️ Is share me 0 tasks hain — add karne ko kuch nahi. Purana data untouched hai.', true);
+    return;
+  }
+  const res = importSharedPayload(payload);
+  if (res.status === 'duplicate') {
+    showShareMsg(`ℹ️ Share ID ${payload.sid} pehle hi import ho chuka hai — duplicate add nahi kiya.`, false);
+  } else {
+    $('importInput').value = '';
+    renderAll();
+    refreshLastShareInfo();
+    showShareMsg(`✅ Share ID ${payload.sid || '(legacy)'}: ${res.added} task(s) add ho gaye. Purana data safe hai — kuch remove nahi hua.`, true);
   }
 };
 
@@ -383,4 +630,5 @@ initDateInput();
 tickClock();
 checkMidnightReset();
 checkShareImport();
+refreshLastShareInfo();
 renderAll();
