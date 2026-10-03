@@ -54,10 +54,9 @@
         <button id="clearDoneBtn" class="btn ghost small">Remove all completed</button>
         <button id="checkoutBtn" class="btn success small">✔ Day Checkout</button>
         <button id="shareBtn" class="btn primary small" title="Unique Share ID ke saath share link banao">🔗 Share Link</button>
-        <button id="importOpenBtn" class="btn ghost small" title="B ka share link / code paste karke import karo">📥 Import Share</button>
       </div>
 
-      <!-- SHARE PANEL: Unique Share ID + link + manual import -->
+      <!-- SHARE PANEL: Unique Share ID + link -->
       <div id="sharePanel" class="share-panel" hidden>
         <h3>🔗 Share <span id="shareIdBadge" class="share-id" title="Unique Share ID">—</span></h3>
         <p class="hint">Har Share ka ek <b>Unique Share ID</b> banta hai (jaise <code>TD-X1AB9Q</code>). Wahi link B ko bhejo. Refresh ya dobara kholne par tasks <b>duplicate add nahi</b> honge aur tumhara purana data <b>remove nahi</b> hoga.</p>
@@ -70,11 +69,6 @@
         <div class="share-row">
           <input id="shareLinkText" type="text" readonly placeholder="Share dabate hi link banega..." />
           <button id="copyLinkBtn" class="btn ghost small" type="button">Copy Link</button>
-        </div>
-        <label class="share-label" for="importInput">Import — B ka link / code yahan paste karo</label>
-        <div class="share-row">
-          <input id="importInput" type="text" placeholder="Paste share link or code..." autocomplete="off" />
-          <button id="importBtn" class="btn primary small" type="button">Import</button>
         </div>
         <p id="shareMsg" class="share-msg" aria-live="polite"></p>
         <div class="share-foot">

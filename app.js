@@ -543,7 +543,7 @@ function openSharePanel(withFreshShare) {
     $('shareIdBadge').textContent = sid;
     $('shareIdText').textContent = sid;
     $('shareLinkText').value = link;
-    showShareMsg(`✅ Naya Share ID ${sid} bana (${count} tasks). Link auto-copy karne ki koshish ho rahi hai...`, true);
+    showShareMsg(`Ready to share: Link Copy to clipboard`, true);
     copyText(link, `🔗 Share ID ${sid} ka link copy ho gaya! B ko bhejo.`);
     refreshLastShareInfo();
   } else {
@@ -554,7 +554,7 @@ function openSharePanel(withFreshShare) {
       const shares = loadShares();
       showShareMsg(`Pichhla Share ID: ${last}${shares[last] ? ` (${shares[last].count} tasks)` : ''}. Naya link chahiye to “Share Link” dabao.`, true);
     } else {
-      showShareMsg('B ka link/code neeche paste karke Import dabao. Naya link banane ke liye “Share Link” dabao.', true);
+      showShareMsg('Naya link banane ke liye “Share Link” dabao.', true);
     }
   }
   $('sharePanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -583,7 +583,6 @@ async function copyText(text, okAlert) {
   }
 }
 $('shareBtn').onclick = () => openSharePanel(true);
-$('importOpenBtn').onclick = () => openSharePanel(false);
 $('shareCloseBtn').onclick = () => { $('sharePanel').hidden = true; };
 $('copyIdBtn').onclick = () => {
   const sid = $('shareIdText').textContent;
@@ -594,36 +593,6 @@ $('copyLinkBtn').onclick = () => {
   const link = $('shareLinkText').value;
   if (!link) { showShareMsg('Pehle “Share Link” dabakar link banao.', false); return; }
   copyText(link, '🔗 Share link copy ho gaya! B ko bhejo.');
-};
-$('importBtn').onclick = () => {
-  const raw = $('importInput').value;
-  const found = extractShareCode(raw);
-  if (found.onlyId) {
-    showShareMsg(`⚠️ "${found.onlyId}" sirf Share ID hai — usme task data nahi hota. B se poora share link/code maango aur yahan paste karo.`, false);
-    return;
-  }
-  if (!found.code) {
-    showShareMsg('⚠️ Koi valid share link/code nahi mila. Poora link paste karo (usme #s= ya ?s= hota hai). Kuch remove nahi kiya.', false);
-    return;
-  }
-  const payload = decodeData(found.code);
-  if (!payload) {
-    showShareMsg('⚠️ Ye code decode nahi hua — link adhura/galat hai. Kuch remove/change nahi kiya.', false);
-    return;
-  }
-  if (!payload.tasks.length) {
-    showShareMsg('ℹ️ Is share me 0 tasks hain — add karne ko kuch nahi. Purana data untouched hai.', true);
-    return;
-  }
-  const res = importSharedPayload(payload);
-  if (res.status === 'duplicate') {
-    showShareMsg(`ℹ️ Share ID ${payload.sid} pehle hi import ho chuka hai — duplicate add nahi kiya.`, false);
-  } else {
-    $('importInput').value = '';
-    renderAll();
-    refreshLastShareInfo();
-    showShareMsg(`✅ Share ID ${payload.sid || '(legacy)'}: ${res.added} task(s) add ho gaye. Purana data safe hai — kuch remove nahi hua.`, true);
-  }
 };
 
 initDateInput();
