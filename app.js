@@ -245,6 +245,74 @@ function renderLog() {
 }
 function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
+// ---- Data Encoder / Decoder for Sharing (A person -> B person) ----
+// Problem: localStorage sirf usi browser me hota hai. GitHub Pages par file public
+// hone se sirf code share hota hai, data nahi. Isliye B ko khaali list dikhti hai
+// ya purana data overwrite/remove jaisa lagta hai.
+// Solution: tasks ko Base64URL me encode karke link me bhejo (?s=...).
+// B ke kholte hi link se decode hokar tasks merge ho jayenge, kuch remove nahi hoga.
+function encodeData(arr) {
+  const json = JSON.stringify(arr);
+  // Hindi/emoji safe (UTF-8 -> base64)
+  const b64 = btoa(unescape(encodeURIComponent(json)));
+  // URL-safe: + -> -, / -> _, = padding hatao
+  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function decodeData(code) {
+  try {
+    if (!code || typeof code !== 'string') return null;
+    let b64 = code.replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    const json = decodeURIComponent(escape(atob(b64)));
+    const arr = JSON.parse(json);
+    if (!Array.isArray(arr)) return null;
+    // sirf valid task object rakho — galat data se purana data remove na ho
+    return arr.filter(x => x && typeof x.text === 'string' && typeof x.date === 'string');
+  } catch { return null; }
+}
+function getShareLink() {
+  const tasks = loadTasks();
+  const code = encodeData(tasks);
+  const base = location.href.split('?')[0].split('#')[0];
+  return `${base}?s=${code}`;
+}
+function importSharedTasks(sharedArr) {
+  if (!sharedArr || !sharedArr.length) return 0;
+  const tasks = loadTasks();
+  const ids = new Set(tasks.map(t => String(t.id)));
+  let added = 0;
+  sharedArr.forEach(t => {
+    // id na ho ya clash ho to nayi id do — taaki purana task remove/overwrite na ho
+    if (!t.id || ids.has(String(t.id))) {
+      t.id = Date.now() + Math.floor(Math.random() * 1000000) + added;
+    }
+    if (typeof t.done !== 'boolean') t.done = false;
+    if (!t.time) t.time = '';
+    tasks.push(t);
+    ids.add(String(t.id));
+    added++;
+  });
+  saveTasks(tasks);
+  return added;
+}
+function checkShareImport() {
+  const params = new URLSearchParams(location.search);
+  const code = params.get('s');
+  if (!code) return;
+  const shared = decodeData(code);
+  if (shared && shared.length) {
+    const n = importSharedTasks(shared);
+    // link se ?s= hatao taaki refresh par dobara add na ho
+    history.replaceState(null, '', location.pathname);
+    renderAll();
+    alert(`🔗 ${n} shared task(s) add ho gaye! Aapka purana data safe hai — kuch remove nahi hua.`);
+  } else if (shared && !shared.length) {
+    history.replaceState(null, '', location.pathname);
+  } else {
+    alert('⚠️ Share link kharab hai — decode nahi hua. Kuch remove/change nahi kiya.');
+  }
+}
+
 function renderAll() { renderTasks(); renderFuture(); renderCalendar(); renderLog(); }
 
 // ---- Events ----
@@ -301,8 +369,18 @@ $('clearLogBtn').onclick = () => {
 };
 $('prevMonth').onclick = () => { calView.setMonth(calView.getMonth() - 1); renderCalendar(); };
 $('nextMonth').onclick = () => { calView.setMonth(calView.getMonth() + 1); renderCalendar(); };
+$('shareBtn').onclick = async () => {
+  const link = getShareLink();
+  try {
+    await navigator.clipboard.writeText(link);
+    alert('🔗 Share link copy ho gaya! B person ko WhatsApp/Telegram par bhejo.\n\nLink kholte hi tasks auto-add honge, purana data remove nahi hoga.');
+  } catch {
+    prompt('Ye link copy karke B ko bhejo:', link);
+  }
+};
 
 initDateInput();
 tickClock();
 checkMidnightReset();
+checkShareImport();
 renderAll();
